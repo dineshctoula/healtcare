@@ -1,19 +1,34 @@
 import React, { useState } from 'react';
 import { Calculator, CheckCircle2, AlertCircle, ArrowRight, RotateCcw, ShieldCheck, FileText, Clock, HelpCircle } from 'lucide-react';
 
+/**
+ * Props expected by the EligibilityCalculator section.
+ * The parent passes onOpenBooking so the calculator can forward the user
+ * directly to the booking modal once they've checked their eligibility.
+ */
 interface EligibilityCalculatorProps {
   onOpenBooking: (serviceName?: string) => void;
 }
 
 export const EligibilityCalculator: React.FC<EligibilityCalculatorProps> = ({ onOpenBooking }) => {
+  // Profession narrows the options in both the title dropdown and the fee logic
   const [profession, setProfession] = useState<'Doctor' | 'Nurse' | 'Allied'>('Doctor');
   const [title, setTitle] = useState<string>('Specialist');
+  // Stored as number (years) so the range slider can bind to it directly
   const [yearsExp, setYearsExp] = useState<number>(3);
+  // The DHA uses a tier system based on where your degree was awarded;
+  // Tier 1 (UK/US/CA/AU) usually means the Prometric exam can be waived
   const [qualificationCountry, setQualificationCountry] = useState<string>('UK/US/Canada (Tier 1)');
   const [hasDataFlow, setHasDataFlow] = useState<boolean>(false);
   const [hasPassedPrometric, setHasPassedPrometric] = useState<boolean>(false);
 
-  // Calculation Logic
+  /**
+   * Core eligibility calculation — runs on every render because all inputs
+   * are controlled state. Not expensive enough to warrant useMemo here.
+   *
+   * Returns an object the result panel can display directly without extra
+   * transformation in JSX.
+   */
   const getEligibilityResult = () => {
     let eligible = false;
     let examRequired = true;
@@ -71,7 +86,9 @@ export const EligibilityCalculator: React.FC<EligibilityCalculatorProps> = ({ on
       else eligible = false;
     }
 
+    // Passing the Prometric exam always removes the exam requirement, regardless of tier
     if (hasPassedPrometric) examRequired = false;
+    // If DataFlow is already done, the applicant saves ~1 200 AED in PSV costs
     if (hasDataFlow) estimatedCostAED -= 1200;
 
     return {
