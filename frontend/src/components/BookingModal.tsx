@@ -1,12 +1,32 @@
 import React, { useState, useEffect } from 'react';
-import { X, Calendar, Clock, CheckCircle2, User, Mail, Phone, Briefcase, FileText, Send, Sparkles } from 'lucide-react';
+import { X, CheckCircle2, User, Mail, Phone, Send, Sparkles } from 'lucide-react';
 import { bookConsultation } from '../services/api';
+
+// These are the categories we currently support - should match what's in the backend
+const SERVICE_CATEGORIES = [
+  'Healthcare Licensing & Exam Preparation',
+  'Healthcare Recruitment & Staffing',
+  'Clinic & Healthcare Business Setup',
+  'Training & Education Services',
+  'Medical Support Services',
+];
 
 interface BookingModalProps {
   isOpen: boolean;
   onClose: () => void;
+  // These two props let parent components pre-fill the form when a user
+  // clicks "Book" from a specific service card
   initialService?: string;
   initialCategory?: string;
+}
+
+// Represents the data returned after a successful booking
+interface BookingConfirmation {
+  referenceNo: string;
+  fullName: string;
+  email: string;
+  serviceCategory: string;
+  preferredDate: string;
 }
 
 export const BookingModal: React.FC<BookingModalProps> = ({
@@ -15,25 +35,31 @@ export const BookingModal: React.FC<BookingModalProps> = ({
   initialService,
   initialCategory,
 }) => {
+  // --- Form field state ---
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [profession, setProfession] = useState('Specialist Doctor');
-  const [serviceCategory, setServiceCategory] = useState('Healthcare Licensing & Exam Preparation');
+  const [serviceCategory, setServiceCategory] = useState(SERVICE_CATEGORIES[0]);
   const [preferredDate, setPreferredDate] = useState('');
   const [message, setMessage] = useState('');
 
+  // --- Submission state ---
   const [loading, setLoading] = useState(false);
-  const [successData, setSuccessData] = useState<any>(null);
+  // successData is null until the booking completes, then we show a confirmation screen
+  const [successData, setSuccessData] = useState<BookingConfirmation | null>(null);
   const [error, setError] = useState('');
 
+  // When the modal is opened from a specific service card, pre-fill relevant fields
   useEffect(() => {
     if (initialCategory) setServiceCategory(initialCategory);
-    if (initialService) setMessage(`Inquiry regarding service: ${initialService}`);
+    if (initialService) setMessage(`Inquiry regarding: ${initialService}`);
   }, [initialCategory, initialService]);
 
+  // Don't render anything if the modal is closed - keeps DOM clean
   if (!isOpen) return null;
 
+  // Handles form submission, API call, and fallback if backend is unavailable
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -46,45 +72,66 @@ export const BookingModal: React.FC<BookingModalProps> = ({
         phone,
         profession,
         serviceCategory,
+        // Default to today's date if the user didn't pick one
         preferredDate: preferredDate || new Date().toISOString().split('T')[0],
         message,
       });
-
       setSuccessData(res.data);
     } catch (err) {
-      // Local fallback code generator if backend is starting
+      // Backend might still be cold-starting, so we generate a local
+      // reference number so the UX doesn't break entirely
       const randomNum = Math.floor(1000 + Math.random() * 9000);
       setSuccessData({
         referenceNo: `DXB-HC-2026-${randomNum}`,
         fullName,
         email,
         serviceCategory,
-        preferredDate: preferredDate || '2026-08-15',
+        preferredDate: preferredDate || new Date().toISOString().split('T')[0],
       });
     } finally {
       setLoading(false);
     }
   };
 
+  // Reset form and close when the user dismisses the confirmation screen
+  const handleDone = () => {
+    setSuccessData(null);
+    setFullName('');
+    setEmail('');
+    setPhone('');
+    setMessage('');
+    onClose();
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fadeIn">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fadeIn"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Consultation Booking"
+    >
       <div className="glass-panel w-full max-w-xl rounded-2xl p-6 sm:p-8 space-y-6 relative border-emerald-500/30 max-h-[90vh] overflow-y-auto">
-        
+
+        {/* Close button - sits in the top-right corner of the modal */}
         <button
           onClick={onClose}
-          className="absolute top-5 right-5 p-2 text-slate-400 hover:text-white bg-slate-900 rounded-lg border border-slate-800"
+          aria-label="Close booking modal"
+          className="absolute top-5 right-5 p-2 text-slate-400 hover:text-white bg-slate-900 rounded-lg border border-slate-800 transition-colors"
         >
           <X className="w-5 h-5" />
         </button>
 
+        {/* Conditionally render success screen or booking form */}
         {successData ? (
+          // --- Confirmation screen ---
           <div className="text-center py-8 space-y-4">
             <div className="w-16 h-16 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center mx-auto">
               <CheckCircle2 className="w-8 h-8" />
             </div>
-            
+
             <h3 className="text-2xl font-bold text-white">Consultation Booking Confirmed!</h3>
-            
+
+            {/* Summary card showing what was booked */}
             <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 space-y-2 text-xs text-left max-w-md mx-auto">
               <div className="flex justify-between border-b border-slate-800 pb-2">
                 <span className="text-slate-400">Booking Reference:</span>
@@ -105,35 +152,49 @@ export const BookingModal: React.FC<BookingModalProps> = ({
             </div>
 
             <p className="text-slate-400 text-xs">
-              A confirmation email has been dispatched to <span className="text-white font-medium">{successData.email}</span> with your senior healthcare consultant assignment.
+              A confirmation has been sent to{' '}
+              <span className="text-white font-medium">{successData.email}</span>{' '}
+              with your consultant assignment details.
             </p>
 
             <button
-              onClick={() => {
-                setSuccessData(null);
-                onClose();
-              }}
-              className="px-6 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-bold text-xs rounded-xl shadow-lg"
+              onClick={handleDone}
+              className="px-6 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-bold text-xs rounded-xl shadow-lg hover:from-emerald-500 hover:to-teal-500 transition-all"
             >
               Done
             </button>
           </div>
         ) : (
+          // --- Booking form ---
           <form onSubmit={handleSubmit} className="space-y-5">
+            {/* Form header */}
             <div className="space-y-1">
               <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 text-[11px] font-bold">
                 <Sparkles className="w-3 h-3" /> Priority Dubai Healthcare Advisory
               </div>
               <h3 className="text-xl font-bold text-white">Book Expert Consultation</h3>
-              <p className="text-xs text-slate-400">Connect directly with certified DHA licensing advisors and facility setup consultants in Dubai.</p>
+              <p className="text-xs text-slate-400">
+                Connect directly with certified DHA licensing advisors and facility setup consultants in Dubai.
+              </p>
             </div>
 
+            {/* Inline error banner - shown if submission fails unexpectedly */}
+            {error && (
+              <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-semibold">
+                {error}
+              </div>
+            )}
+
             <div className="space-y-4">
+              {/* Full name field */}
               <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-300">Full Name *</label>
+                <label htmlFor="bm-fullname" className="text-xs font-bold text-slate-300">
+                  Full Name <span className="text-red-400">*</span>
+                </label>
                 <div className="relative">
                   <User className="w-4 h-4 text-slate-500 absolute left-3.5 top-3.5" />
                   <input
+                    id="bm-fullname"
                     type="text"
                     required
                     value={fullName}
@@ -144,12 +205,16 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                 </div>
               </div>
 
+              {/* Email + Phone row */}
               <div className="grid sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-300">Email Address *</label>
+                  <label htmlFor="bm-email" className="text-xs font-bold text-slate-300">
+                    Email Address <span className="text-red-400">*</span>
+                  </label>
                   <div className="relative">
                     <Mail className="w-4 h-4 text-slate-500 absolute left-3.5 top-3.5" />
                     <input
+                      id="bm-email"
                       type="email"
                       required
                       value={email}
@@ -161,10 +226,13 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-300">Phone / WhatsApp *</label>
+                  <label htmlFor="bm-phone" className="text-xs font-bold text-slate-300">
+                    Phone / WhatsApp <span className="text-red-400">*</span>
+                  </label>
                   <div className="relative">
                     <Phone className="w-4 h-4 text-slate-500 absolute left-3.5 top-3.5" />
                     <input
+                      id="bm-phone"
                       type="tel"
                       required
                       value={phone}
@@ -176,10 +244,14 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                 </div>
               </div>
 
+              {/* Profession + Date row */}
               <div className="grid sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-300">Profession / Title</label>
+                  <label htmlFor="bm-profession" className="text-xs font-bold text-slate-300">
+                    Profession / Title
+                  </label>
                   <input
+                    id="bm-profession"
                     type="text"
                     value={profession}
                     onChange={(e) => setProfession(e.target.value)}
@@ -189,8 +261,11 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-300">Preferred Consultation Date</label>
+                  <label htmlFor="bm-date" className="text-xs font-bold text-slate-300">
+                    Preferred Consultation Date
+                  </label>
                   <input
+                    id="bm-date"
                     type="date"
                     value={preferredDate}
                     onChange={(e) => setPreferredDate(e.target.value)}
@@ -199,24 +274,30 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                 </div>
               </div>
 
+              {/* Service category dropdown */}
               <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-300">Primary Service Category</label>
+                <label htmlFor="bm-category" className="text-xs font-bold text-slate-300">
+                  Primary Service Category
+                </label>
                 <select
+                  id="bm-category"
                   value={serviceCategory}
                   onChange={(e) => setServiceCategory(e.target.value)}
                   className="w-full glass-input px-4 py-3 rounded-xl text-xs font-semibold"
                 >
-                  <option value="Healthcare Licensing & Exam Preparation">Healthcare Licensing & Exam Preparation</option>
-                  <option value="Healthcare Recruitment & Staffing">Healthcare Recruitment & Staffing</option>
-                  <option value="Clinic & Healthcare Business Setup">Clinic & Healthcare Business Setup</option>
-                  <option value="Training & Education Services">Training & Education Services</option>
-                  <option value="Medical Support Services">Medical Support Services</option>
+                  {SERVICE_CATEGORIES.map((cat) => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
                 </select>
               </div>
 
+              {/* Free-text notes */}
               <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-300">Inquiry Notes / Specific Requirements</label>
+                <label htmlFor="bm-message" className="text-xs font-bold text-slate-300">
+                  Inquiry Notes / Specific Requirements
+                </label>
                 <textarea
+                  id="bm-message"
                   rows={3}
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
@@ -229,10 +310,11 @@ export const BookingModal: React.FC<BookingModalProps> = ({
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-emerald-950/60 flex items-center justify-center gap-2"
+              aria-busy={loading}
+              className="w-full py-3.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-emerald-950/60 flex items-center justify-center gap-2 disabled:opacity-60 transition-all"
             >
               <Send className="w-4 h-4" />
-              <span>{loading ? 'Processing Schedule...' : 'Confirm Consultation Booking'}</span>
+              <span>{loading ? 'Submitting...' : 'Confirm Consultation Booking'}</span>
             </button>
           </form>
         )}
