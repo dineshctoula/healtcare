@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Award, Users, Building, BookOpen, Shield, ArrowRight, CheckCircle2, Clock, Target, Info, Sparkles, X, ChevronRight } from 'lucide-react';
 
+/** A single service offering within a category */
 interface ServiceItem {
   id: string;
   title: string;
@@ -11,6 +12,7 @@ interface ServiceItem {
   targetAudience: string;
 }
 
+/** A group of related services (e.g. 'Healthcare Licensing & Exam Preparation') */
 interface ServiceCategory {
   id: string;
   categoryTitle: string;
@@ -32,6 +34,9 @@ export const ServiceCatalog: React.FC<ServiceCatalogProps> = ({
   const [activeTab, setActiveTab] = useState<string>('all');
   const [selectedService, setSelectedService] = useState<{ service: ServiceItem; categoryTitle: string } | null>(null);
 
+  // Map icon name strings (stored in backend JSON) back to Lucide components.
+  // We use a string in the data layer so it can be serialised over the API;
+  // Award is the safe fallback for anything we haven't mapped yet.
   const getCategoryIcon = (iconName: string) => {
     switch (iconName) {
       case 'Award': return Award;
@@ -43,6 +48,8 @@ export const ServiceCatalog: React.FC<ServiceCatalogProps> = ({
     }
   };
 
+  // Show all categories when 'all' is selected, otherwise filter to the one
+  // the user clicked in the tab strip
   const filteredCategories = activeTab === 'all'
     ? categories
     : categories.filter(c => c.id === activeTab);
@@ -189,7 +196,8 @@ export const ServiceCatalog: React.FC<ServiceCatalogProps> = ({
               
               <button
                 onClick={() => setSelectedService(null)}
-                className="absolute top-5 right-5 p-2 text-slate-400 hover:text-white bg-slate-900 rounded-lg border border-slate-800"
+                aria-label="Close service details"
+                className="absolute top-5 right-5 p-2 text-slate-400 hover:text-white bg-slate-900 rounded-lg border border-slate-800 transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
