@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, CheckCircle2, User, Mail, Phone, Send, Sparkles } from 'lucide-react';
 import { bookConsultation } from '../services/api';
+import { todayISO } from '../utils/date';
 
 // These are the categories we currently support - should match what's in the backend
 const SERVICE_CATEGORIES = [
@@ -73,7 +74,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
         profession,
         serviceCategory,
         // Default to today's date if the user didn't pick one
-        preferredDate: preferredDate || new Date().toISOString().split('T')[0],
+        preferredDate: preferredDate || todayISO(),
         message,
       });
       setSuccessData(res.data);
@@ -86,7 +87,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
         fullName,
         email,
         serviceCategory,
-        preferredDate: preferredDate || new Date().toISOString().split('T')[0],
+        preferredDate: preferredDate || todayISO(),
       });
     } finally {
       setLoading(false);
